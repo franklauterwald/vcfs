@@ -1,16 +1,25 @@
-# This is a sample Python script.
+from fs import Fs
+import pyfuse3
+import trio
 
-# Press Umschalt+F10 to execute it or replace it with your code.
-# Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
+def main():
+    source_filenames = ['/mnt/sdb/use/test-cloud-container/foo.000', '/mnt/sdb/use/test-cloud-container/foo.001']
+    dest_filename    = 'foo'
+    dest_mode        = 0o666
+    mountpoint       = '/mnt/sdb/use/test-cloud-container/mnt/'
+    fs = Fs(source_filenames, dest_filename, dest_mode)
+    fuse_options = set(pyfuse3.default_options)
+    fuse_options.add('fsname=hello')
+    fuse_options.add('debug')
+    pyfuse3.init(fs, mountpoint, fuse_options)
+    try:
+        trio.run(pyfuse3.main)
+    except:
+        pyfuse3.close(unmount=False)
+        raise
 
-
-def print_hi(name):
-    # Use a breakpoint in the code line below to debug your script.
-    print(f'Hi, {name}')  # Press Strg+8 to toggle the breakpoint.
-
+    pyfuse3.close()
 
 # Press the green button in the gutter to run the script.
 if __name__ == '__main__':
-    print_hi('PyCharm')
-
-# See PyCharm help at https://www.jetbrains.com/help/pycharm/
+    main()
