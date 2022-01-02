@@ -86,7 +86,7 @@ class Fs(pyfuse3.Operations):
 
     async def write(self, fh, off, buf):
         assert fh == self.dest_inode
-        raise FUSEError(errno.ENOSYS)
+        return self.write_internal(off, buf, 0)
 
     def find_source_file(self, off):
         for source_file in self.source_files:
@@ -104,3 +104,19 @@ class Fs(pyfuse3.Operations):
         source_file.handle.seek(pos_in_file)
         cnt = min(size, source_file.size - pos_in_file)
         return source_file.handle.read(cnt) + self.read_internal(off+cnt, size-cnt)
+
+    def write_internal(self, off, buf, already_written):
+        source_file = self.find_source_file(off)
+        if source_file == None:
+            return already_written
+        pos_in_file = off - source_file.start_pos
+        source_file.handle.seek(pos_in_file)
+        cnt = min(len(buf), source_file.size - pos_in_file)
+        buf_this      = buf[0:cnt]
+        buf_remaining = buf[cnt:-1]
+        bytes_written = source_file.handle.write(buf_this)
+        if len(buf_remaining) == 0:
+            # done
+            return already_written + bytes_written
+        else:
+            return self.write_internal(off + bytes_written, buf_remaining, already_written + bytes_written)
