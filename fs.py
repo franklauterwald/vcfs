@@ -34,8 +34,8 @@ class Fs(pyfuse3.Operations):
     async def lookup(self, inode_p, name, ctx=None):
         # inode_p: parent inode
         assert inode_p == pyfuse3.ROOT_INODE
-        if name == self.dest_filename:
-            return self.getattr(self.dest_inode, ctx)
+        if name == self.dest_filename.encode('utf-8'):
+            return await self.getattr(self.dest_inode, ctx)
         else:
             entry = pyfuse3.EntryAttributes()
             entry.st_ino = 0 # denotes: does not exist
@@ -82,7 +82,7 @@ class Fs(pyfuse3.Operations):
 
     async def read(self, fh, off, size):
         assert fh == self.dest_inode
-        pass
+        return self.read_internal(off, size)
 
     async def write(self, fh, off, buf):
         assert fh == self.dest_inode
@@ -90,16 +90,17 @@ class Fs(pyfuse3.Operations):
 
     def find_source_file(self, off):
         for source_file in self.source_files:
-            if off > source_file.start_pos and off < source_file.end_pos:
+            if off >= source_file.start_pos and off < source_file.end_pos:
                 return source_file
         return None
 
     def read_internal(self, off, size):
         if size <= 0:
-            return []
+            return b''
         source_file = self.find_source_file(off)
         if source_file == None:
-            return []
-        source_file.handle.seek(off - source_file.start_pos)
-        cnt = min(size, (off+size) - source_file.end_pos)
+            return b''
+        pos_in_file = off - source_file.start_pos
+        source_file.handle.seek(pos_in_file)
+        cnt = min(size, source_file.size - pos_in_file)
         return source_file.handle.read(cnt) + self.read_internal(off+cnt, size-cnt)
